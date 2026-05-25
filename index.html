@@ -1,0 +1,2010 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulazione motore DC</title>
+  <style>
+    :root {
+      --bg: #0d1321;
+      --panel: #121b2f;
+      --panel-2: #17233b;
+      --panel-3: #1d2c49;
+      --text: #eef4ff;
+      --muted: #a9b7d0;
+      --line: rgba(255, 255, 255, 0.13);
+      --accent: #53d6ff;
+      --accent-2: #7cffc4;
+      --warning: #ffd166;
+      --copper: #d9832e;
+      --copper-light: #ffb46b;
+      --red: #f05252;
+      --blue: #4f83ff;
+      --green: #50e3a4;
+      --yellow: #ffd166;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(83, 214, 255, 0.16), transparent 26%),
+        radial-gradient(circle at 85% 10%, rgba(124, 255, 196, 0.10), transparent 30%),
+        linear-gradient(135deg, #080d18 0%, var(--bg) 55%, #0a1020 100%);
+      padding: 28px;
+    }
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(18, 27, 47, 0.95), rgba(29, 44, 73, 0.86));
+      border-radius: var(--radius);
+      padding: 26px 28px;
+      box-shadow: var(--shadow);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: clamp(28px, 4vw, 46px);
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+
+    .title-wrap p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .badge {
+      border: 1px solid rgba(83, 214, 255, 0.35);
+      background: rgba(83, 214, 255, 0.11);
+      color: #c9f4ff;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-weight: 700;
+      white-space: nowrap;
+      font-size: 14px;
+    }
+
+    .formula-card,
+    .main-grid,
+    .data-zone {
+      margin-top: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      background: rgba(18, 27, 47, 0.88);
+      backdrop-filter: blur(12px);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .formula-card {
+      padding: 20px 24px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .section-kicker {
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent-2);
+      font-size: 12px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .formula-main {
+      font-size: clamp(24px, 3vw, 36px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+
+    .term-ideal { color: var(--text); }
+    .term-ke { color: var(--copper-light); }
+    .term-friction { color: var(--warning); }
+
+    .formula-text {
+      color: var(--muted);
+      margin: 8px 0 0;
+      max-width: 820px;
+      line-height: 1.5;
+    }
+
+    .mode-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
+      color: var(--text);
+      font-weight: 800;
+      min-width: 190px;
+      justify-content: center;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 380px;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .simulation {
+      padding: 22px;
+      min-height: 650px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .simulation::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: radial-gradient(circle at center, black 0%, transparent 82%);
+      pointer-events: none;
+    }
+
+    .sim-head {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .sim-head h2,
+    .controls h2,
+    .data-card h2 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+    }
+
+    .sim-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .motor-stage {
+      position: relative;
+      z-index: 2;
+      min-height: 500px;
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      background:
+        radial-gradient(circle at center, rgba(83, 214, 255, 0.10), transparent 42%),
+        rgba(255, 255, 255, 0.025);
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .magnet {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: clamp(82px, 12vw, 118px);
+      height: 320px;
+      border-radius: 22px;
+      display: grid;
+      place-items: center;
+      font-size: 42px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      color: white;
+      box-shadow: 0 16px 38px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      z-index: 4;
+    }
+
+    .magnet::after {
+      content: "polo";
+      position: absolute;
+      bottom: 18px;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      opacity: 0.82;
+    }
+
+    .magnet.north {
+      left: clamp(16px, 4vw, 44px);
+      background: linear-gradient(160deg, #ff8d8d, var(--red) 65%, #9f2424);
+    }
+
+    .magnet.south {
+      right: clamp(16px, 4vw, 44px);
+      background: linear-gradient(160deg, #7aa5ff, var(--blue) 65%, #243f9f);
+    }
+
+    .field-lines {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: min(560px, 66%);
+      height: 275px;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      z-index: 1;
+    }
+
+    .field-line {
+      height: 2px;
+      background: linear-gradient(90deg, rgba(83, 214, 255, 0.08), rgba(83, 214, 255, 0.90), rgba(83, 214, 255, 0.08));
+      position: relative;
+      box-shadow: 0 0 12px rgba(83, 214, 255, 0.24);
+    }
+
+    .field-line::after {
+      content: "›";
+      position: absolute;
+      right: 10px;
+      top: -16px;
+      color: rgba(83, 214, 255, 0.98);
+      font-weight: 900;
+      font-size: 32px;
+      line-height: 1;
+    }
+
+    .field-label {
+      position: absolute;
+      top: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #c9f4ff;
+      font-weight: 850;
+      background: rgba(83, 214, 255, 0.12);
+      border: 1px solid rgba(83, 214, 255, 0.22);
+      padding: 8px 12px;
+      border-radius: 999px;
+      z-index: 6;
+      white-space: nowrap;
+    }
+
+    .coil-system {
+      position: absolute;
+      left: 50%;
+      top: 48%;
+      transform: translate(-50%, -50%);
+      width: 270px;
+      height: 245px;
+      z-index: 5;
+    }
+
+    .coil-wrap {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 230px;
+      height: 150px;
+      transform: translate(-50%, -50%) rotate(-12deg);
+      filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.35));
+    }
+
+    .coil {
+      width: 100%;
+      height: 100%;
+      border: 13px solid var(--copper);
+      border-radius: 28px;
+      background: rgba(217, 131, 46, 0.10);
+      box-shadow: inset 0 0 0 4px rgba(255, 180, 107, 0.32), 0 0 42px rgba(217, 131, 46, 0.34);
+    }
+
+    .axis {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 34px;
+      height: 34px;
+      background: #edf5ff;
+      border-radius: 50%;
+      border: 7px solid #273755;
+      box-shadow: 0 0 0 9px rgba(255, 255, 255, 0.06), 0 0 28px rgba(83, 214, 255, 0.22);
+    }
+
+    .current-marker,
+    .force-marker {
+      position: absolute;
+      z-index: 8;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(7, 17, 31, 0.72);
+      backdrop-filter: blur(8px);
+      white-space: nowrap;
+    }
+
+    .current-marker { color: var(--green); }
+    .force-marker { color: var(--yellow); }
+
+    .current-left {
+      left: -18px;
+      top: 96px;
+    }
+
+    .current-right {
+      right: -18px;
+      top: 28px;
+    }
+
+    .force-up {
+      left: 50%;
+      top: -38px;
+      transform: translateX(-50%);
+    }
+
+    .force-down {
+      left: 50%;
+      bottom: -42px;
+      transform: translateX(-50%);
+    }
+
+    .commutator-group {
+      position: absolute;
+      left: 50%;
+      top: calc(50% + 145px);
+      transform: translateX(-50%);
+      width: 170px;
+      display: grid;
+      justify-items: center;
+      gap: 8px;
+      z-index: 7;
+    }
+
+    .commutator {
+      position: relative;
+      width: 122px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+    }
+
+    .split-ring {
+      position: relative;
+      width: 76px;
+      height: 28px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--copper-light) 0 46%, transparent 46% 54%, var(--copper) 54% 100%);
+      border: 2px solid rgba(255, 255, 255, 0.28);
+      box-shadow: 0 0 22px rgba(217, 131, 46, 0.35);
+    }
+
+    .brush {
+      position: absolute;
+      top: 50%;
+      width: 32px;
+      height: 8px;
+      background: rgba(238, 244, 255, 0.72);
+      border-radius: 999px;
+      box-shadow: 0 0 12px rgba(255,255,255,0.18);
+    }
+
+    .brush.left { left: 0; transform: translateY(-50%); }
+    .brush.right { right: 0; transform: translateY(-50%); }
+
+    .commutator-label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 850;
+      background: rgba(18, 27, 47, 0.72);
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      border-radius: 999px;
+    }
+
+    .legend {
+      position: absolute;
+      z-index: 7;
+      bottom: 18px;
+      left: 18px;
+      right: 18px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .legend span {
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+
+    .dot.green { background: var(--green); }
+    .dot.yellow { background: var(--yellow); }
+    .dot.copper { background: var(--copper-light); }
+    .dot.blue { background: var(--accent); }
+
+    .controls {
+      padding: 22px;
+      max-height: 900px;
+      overflow: auto;
+    }
+
+    .control-intro {
+      color: var(--muted);
+      margin: 6px 0 18px;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .mode-switch {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--line);
+      padding: 6px;
+      border-radius: 16px;
+      margin-top: 8px;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .mode-btn,
+    .action-btn,
+    .command-btn {
+      border: 0;
+      cursor: pointer;
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.07);
+      transition: 0.2s ease;
+      font-weight: 800;
+    }
+
+    .mode-btn.active,
+    .command-btn.primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #07111f;
+      box-shadow: 0 10px 25px rgba(83, 214, 255, 0.18);
+    }
+
+    .mode-btn:hover,
+    .action-btn:hover,
+    .command-btn:hover,
+    .info-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.08);
+    }
+
+    .control-section-title {
+      margin: 22px 0 12px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--accent-2);
+      text-transform: uppercase;
+      letter-spacing: 0.11em;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .control {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .control-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .control-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 850;
+    }
+
+    .value {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .info-btn {
+      width: 22px;
+      height: 22px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 999px;
+      border: 1px solid rgba(83, 214, 255, 0.5);
+      background: rgba(83, 214, 255, 0.12);
+      color: #d8f8ff;
+      cursor: pointer;
+      font-weight: 900;
+      font-size: 13px;
+      line-height: 1;
+      padding: 0;
+      flex: 0 0 auto;
+    }
+
+    .info-btn.active {
+      background: var(--accent);
+      color: #07111f;
+      border-color: transparent;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    input[type="range"]:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    .disabled-note {
+      display: none;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    .simple-mode .disabled-note {
+      display: block;
+    }
+
+    .info-panel {
+      display: none;
+      margin-top: 10px;
+      padding: 13px 14px;
+      border-radius: 16px;
+      background: rgba(83, 214, 255, 0.09);
+      border: 1px solid rgba(83, 214, 255, 0.25);
+      color: #dcecff;
+      line-height: 1.48;
+      font-size: 14px;
+    }
+
+    .info-panel.open {
+      display: block;
+    }
+
+    .info-panel strong {
+      color: var(--text);
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .option-row,
+    .command-row {
+      display: grid;
+      gap: 10px;
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+    }
+
+    .toggle-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .switch {
+      position: relative;
+      width: 58px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(124, 255, 196, 0.28);
+      background: rgba(124, 255, 196, 0.13);
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      top: 3px;
+      right: 4px;
+      box-shadow: 0 5px 14px rgba(0, 0, 0, 0.3);
+    }
+
+    .command-row {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .data-zone {
+      display: grid;
+      grid-template-columns: 0.82fr 1.18fr;
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .data-info-card,
+    .data-card {
+      padding: 22px;
+    }
+
+    .data-info-card {
+      display: none;
+      border-color: rgba(83, 214, 255, 0.25);
+      background: rgba(83, 214, 255, 0.08);
+    }
+
+    .data-card {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+
+    .data-info-card.open {
+      display: block;
+    }
+
+    .data-info-card.open + .data-card {
+      grid-column: auto;
+    }
+
+    .data-info-card h3 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+
+    .data-info-card p {
+      margin: 0;
+      color: #dcecff;
+      line-height: 1.55;
+    }
+
+    .data-card h2 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .data-grid {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .data-item {
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.035));
+      position: relative;
+      overflow: hidden;
+    }
+
+    .data-item::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      background: var(--accent);
+      opacity: 0.7;
+    }
+
+    .data-item:nth-child(5)::before { background: var(--copper-light); }
+    .data-item:nth-child(6)::before { background: var(--warning); }
+    .data-item:nth-child(8)::before { background: var(--accent-2); }
+
+    .data-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 800;
+    }
+
+    .data-value {
+      margin-top: 6px;
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(124, 255, 196, 0.12);
+      border: 1px solid rgba(124, 255, 196, 0.25);
+      color: #d5ffef;
+      font-size: 14px;
+      font-weight: 900;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-2);
+      box-shadow: 0 0 14px var(--accent-2);
+    }
+
+    @media (max-width: 980px) {
+      body {
+        padding: 16px;
+      }
+
+      header,
+      .formula-card {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .main-grid,
+      .data-zone {
+        grid-template-columns: 1fr;
+      }
+
+      .data-card,
+      .data-info-card.open + .data-card {
+        grid-column: 1 / -1;
+      }
+
+      .controls {
+        max-height: none;
+      }
+
+      .simulation {
+        min-height: 560px;
+      }
+
+      .data-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .data-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .magnet {
+        width: 64px;
+        height: 230px;
+        font-size: 30px;
+      }
+
+      .field-lines {
+        width: 62%;
+        height: 235px;
+      }
+
+      .coil-system {
+        width: 220px;
+        height: 220px;
+      }
+
+      .coil-wrap {
+        width: 185px;
+        height: 122px;
+      }
+
+      .current-marker,
+      .force-marker {
+        font-size: 12px;
+        padding: 6px 8px;
+      }
+
+      .current-left { left: -10px; }
+      .current-right { right: -10px; }
+      .commutator-group { top: calc(50% + 125px); }
+    }
+  
+
+    /* Pulizia visiva dei riquadri - variante 4.1 */
+    :root {
+      --panel: #10182a;
+      --panel-2: #142038;
+      --panel-3: #17243c;
+      --line: rgba(255, 255, 255, 0.08);
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+      --radius: 18px;
+    }
+
+    body {
+      padding: 22px;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(83, 214, 255, 0.10), transparent 24%),
+        radial-gradient(circle at 88% 6%, rgba(124, 255, 196, 0.07), transparent 28%),
+        linear-gradient(135deg, #08101d 0%, #0d1321 58%, #0a1020 100%);
+    }
+
+    header,
+    .card {
+      border: 1px solid var(--line);
+      background: rgba(16, 24, 42, 0.82);
+      box-shadow: var(--shadow);
+    }
+
+    header {
+      padding: 22px 24px;
+      background: linear-gradient(135deg, rgba(16, 24, 42, 0.90), rgba(20, 32, 56, 0.76));
+    }
+
+    .title-wrap p {
+      max-width: 900px;
+      line-height: 1.55;
+    }
+
+    .badge,
+    .mode-pill,
+    .status-chip,
+    .commutator-label,
+    .legend span,
+    .field-label {
+      border-color: rgba(255, 255, 255, 0.10);
+      background: rgba(255, 255, 255, 0.045);
+      box-shadow: none;
+    }
+
+    .formula-card,
+    .simulation,
+    .controls,
+    .data-info-card,
+    .data-card {
+      padding: 20px;
+    }
+
+    .formula-card,
+    .main-grid,
+    .data-zone {
+      margin-top: 16px;
+    }
+
+    .main-grid,
+    .data-zone {
+      gap: 16px;
+    }
+
+    .formula-card {
+      background: linear-gradient(180deg, rgba(16, 24, 42, 0.86), rgba(13, 19, 33, 0.78));
+    }
+
+    .formula-main {
+      font-size: clamp(23px, 2.7vw, 34px);
+    }
+
+    .formula-text {
+      line-height: 1.58;
+    }
+
+    .simulation {
+      min-height: 620px;
+    }
+
+    .simulation::before {
+      opacity: 0.55;
+      background-size: 40px 40px;
+    }
+
+    .motor-stage {
+      border: 1px solid rgba(255, 255, 255, 0.075);
+      background:
+        radial-gradient(circle at center, rgba(83, 214, 255, 0.08), transparent 38%),
+        rgba(255, 255, 255, 0.018);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    }
+
+    .sim-head,
+    .control-intro {
+      margin-bottom: 14px;
+    }
+
+    .controls {
+      background: rgba(16, 24, 42, 0.78);
+    }
+
+    .control {
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+    }
+
+    .control-section-title {
+      margin: 20px 0 10px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .mode-switch {
+      background: rgba(255, 255, 255, 0.035);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .mode-btn,
+    .action-btn,
+    .command-btn {
+      background: rgba(255, 255, 255, 0.055);
+      border-color: rgba(255, 255, 255, 0.08);
+      box-shadow: none;
+    }
+
+    .mode-btn.active,
+    .command-btn.primary {
+      box-shadow: none;
+    }
+
+    .info-panel {
+      background: rgba(83, 214, 255, 0.065);
+      border: 1px solid rgba(83, 214, 255, 0.18);
+      border-radius: 14px;
+      padding: 12px 13px;
+    }
+
+    .data-info-card {
+      background: rgba(83, 214, 255, 0.055);
+      border-color: rgba(83, 214, 255, 0.16);
+    }
+
+    .data-grid {
+      gap: 10px;
+    }
+
+    .data-item {
+      padding: 13px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.075);
+      background: rgba(255, 255, 255, 0.04);
+      box-shadow: none;
+    }
+
+    .data-item::before {
+      width: 3px;
+      opacity: 0.65;
+    }
+
+    .data-value {
+      font-size: 19px;
+    }
+
+    .magnet {
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.20);
+    }
+
+    .coil-wrap {
+      filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.28));
+    }
+
+    .coil {
+      box-shadow: inset 0 0 0 4px rgba(255, 180, 107, 0.25), 0 0 26px rgba(217, 131, 46, 0.24);
+    }
+
+    .current-marker,
+    .force-marker {
+      background: rgba(7, 17, 31, 0.62);
+      border-color: rgba(255, 255, 255, 0.10);
+      backdrop-filter: none;
+    }
+
+    @media (max-width: 980px) {
+      body { padding: 14px; }
+      .simulation { min-height: 540px; }
+    }
+
+  
+
+    /* Correzione layout: simulazione e pannello controlli allineati, testi senza sovrapposizioni */
+    .main-grid {
+      align-items: stretch !important;
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 400px) !important;
+    }
+
+    .main-grid > .card {
+      height: 100%;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+
+    .simulation,
+    .controls {
+      display: flex;
+      flex-direction: column;
+      align-self: stretch;
+      min-height: 0 !important;
+    }
+
+    .controls {
+      max-height: none !important;
+      overflow: visible !important;
+    }
+
+    .motor-stage {
+      flex: 1 1 auto;
+      min-height: 560px;
+      height: auto;
+    }
+
+    .sim-head {
+      flex-wrap: wrap;
+    }
+
+    .sim-head > div {
+      min-width: 0;
+      flex: 1 1 260px;
+    }
+
+    .sim-head p,
+    .control-intro,
+    .formula-text,
+    .info-panel,
+    .data-info-card p {
+      overflow-wrap: anywhere;
+    }
+
+    .status-chip,
+    .mode-pill,
+    .badge,
+    .field-label,
+    .commutator-label,
+    .legend span {
+      max-width: 100%;
+      white-space: normal !important;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .field-label {
+      top: 16px;
+      max-width: calc(100% - 160px);
+      padding: 7px 10px;
+      font-size: 13px;
+    }
+
+    .control-head,
+    .toggle-line {
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: start;
+      column-gap: 10px;
+      row-gap: 6px;
+    }
+
+    .control-title {
+      min-width: 0;
+      flex-wrap: wrap;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .value {
+      justify-self: end;
+      white-space: nowrap;
+      line-height: 1.25;
+      padding-top: 2px;
+    }
+
+    .option-row {
+      display: grid;
+      gap: 10px;
+    }
+
+    .action-btn {
+      min-width: 0;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: nowrap;
+      text-align: left;
+      line-height: 1.25;
+      gap: 10px;
+    }
+
+    .action-btn .info-btn {
+      margin-left: auto;
+    }
+
+    .mode-switch {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .mode-btn,
+    .action-btn,
+    .command-btn {
+      line-height: 1.25;
+      min-height: 42px;
+      white-space: normal;
+    }
+
+    .legend {
+      bottom: 14px;
+      left: 14px;
+      right: 14px;
+      gap: 8px;
+    }
+
+    .legend span {
+      padding: 7px 9px;
+      font-size: 12px;
+      flex: 0 1 auto;
+    }
+
+    .current-marker,
+    .force-marker {
+      line-height: 1;
+    }
+
+    @media (max-width: 1100px) and (min-width: 981px) {
+      .main-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(330px, 360px) !important;
+      }
+
+      .formula-card,
+      .simulation,
+      .controls,
+      .data-info-card,
+      .data-card {
+        padding: 18px;
+      }
+
+      .motor-stage {
+        min-height: 540px;
+      }
+
+      .magnet {
+        width: 76px;
+        height: 285px;
+      }
+
+      .coil-system {
+        width: 245px;
+        height: 230px;
+      }
+
+      .coil-wrap {
+        width: 210px;
+        height: 138px;
+      }
+    }
+
+    @media (max-width: 980px) {
+      .main-grid {
+        grid-template-columns: 1fr !important;
+      }
+
+      .simulation,
+      .controls {
+        height: auto;
+      }
+
+      .motor-stage {
+        min-height: 520px;
+      }
+
+      .controls {
+        overflow: visible !important;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .field-label {
+        max-width: calc(100% - 40px);
+        font-size: 12px;
+      }
+
+      .legend {
+        justify-content: flex-start;
+      }
+
+      .legend span {
+        flex: 1 1 calc(50% - 8px);
+      }
+
+      .control-head,
+      .toggle-line {
+        grid-template-columns: 1fr;
+      }
+
+      .value {
+        justify-self: start;
+      }
+    }
+
+
+
+    /* Funzionamento app */
+    .coil-wrap {
+      transform-origin: 50% 50%;
+      will-change: transform;
+      transition: filter 0.2s ease;
+    }
+
+    .running .coil-wrap {
+      filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.35)) drop-shadow(0 0 18px rgba(217, 131, 46, 0.22));
+    }
+
+    .switch.off {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .switch.off::after {
+      right: auto;
+      left: 4px;
+      background: rgba(238, 244, 255, 0.58);
+    }
+
+    .commutator-group.off {
+      opacity: 0.46;
+      filter: grayscale(0.35);
+    }
+
+    .action-btn.active-state {
+      border-color: rgba(255, 209, 102, 0.55);
+      background: rgba(255, 209, 102, 0.12);
+      color: #ffe6a6;
+    }
+
+    .field-reversed .field-line::after {
+      content: "‹";
+      left: 10px;
+      right: auto;
+    }
+
+    .field-reversed .field-line {
+      background: linear-gradient(270deg, rgba(83, 214, 255, 0.08), rgba(83, 214, 255, 0.90), rgba(83, 214, 255, 0.08));
+    }
+
+    .current-marker.reversed,
+    .force-marker.reversed {
+      filter: brightness(1.15);
+    }
+
+    .data-value.negative {
+      color: #ffd6d6;
+    }
+
+    .data-value.positive {
+      color: #d9fff0;
+    }
+
+
+    /* Formula 5.0: modalita allineata alla formula e testo a tutta larghezza */
+    .formula-card {
+      display: block;
+    }
+
+    .formula-topline {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      width: 100%;
+    }
+
+    .formula-heading {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .formula-card .formula-text {
+      max-width: none;
+      width: 100%;
+      margin-top: 14px;
+      display: block;
+    }
+
+    .formula-card .mode-pill {
+      align-self: flex-end;
+      flex: 0 0 auto;
+      margin-bottom: 2px;
+    }
+
+    @media (max-width: 760px) {
+      .formula-topline {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .formula-card .mode-pill {
+        align-self: flex-start;
+        margin-bottom: 0;
+      }
+    }
+
+  </style>
+</head>
+<body class="simple-mode">
+  <div class="page">
+    <header>
+      <div class="title-wrap">
+        <h1>Dalla corrente al movimento</h1>
+        <p>Come nella tazza di Faraday, questa app mostra come l'interazione tra corrente elettrica e campo magnetico possa generare una rotazione. Abbiamo scelto di rappresentare questo principio attraverso un motore elettrico a corrente continua, per visualizzare chiaramente corrente, campo magnetico, coppia e commutatore.</p>
+      </div>
+    </header>
+
+    <section class="formula-card card" aria-label="Formula attiva">
+      <div class="formula-topline">
+        <div class="formula-heading">
+          <div class="section-kicker">Formula attiva</div>
+          <p class="formula-main" id="formulaText"><span class="term-ideal">&tau; = N I A B sin(&theta;)</span></p>
+        </div>
+        <div class="mode-pill" id="modePill">Modalit&agrave;: semplice</div>
+      </div>
+      <p class="formula-text" id="formulaExplanation">
+        Nel modello semplice viene mostrata la coppia elettromagnetica ideale prodotta dall'interazione tra corrente e campo magnetico. La coppia &tau; dipende dalla corrente I, dal campo magnetico B, dal numero di spire N, dall'area A della bobina e dall'angolo &theta;.<br><br>
+        Per rendere la visualizzazione chiara, con il commutatore attivo la bobina ruota in modo continuo usando l'intensit&agrave; della coppia ideale. Se il commutatore viene disattivato, la corrente non viene invertita ogni mezzo giro: la bobina tende quindi a oscillare e poi a fermarsi. In questa modalit&agrave; non vengono considerati attrito, inerzia, controelettromotrice o altri effetti realistici.
+      </p>
+    </section>
+
+    <main class="main-grid">
+      <section class="simulation card" aria-label="Area simulazione">
+        <div class="sim-head">
+          <div>
+            <h2>Area di simulazione</h2>
+            <p>Schema pulito del motore DC: campo magnetico, bobina, corrente, forza e commutatore.</p>
+          </div>
+          <span class="status-chip" id="simStatusChip"><span class="status-dot"></span> simulazione in pausa</span>
+        </div>
+
+        <div class="motor-stage">
+          <div class="magnet north" id="leftMagnet">N</div>
+          <div class="magnet south" id="rightMagnet">S</div>
+
+          <div class="field-label" id="fieldLabel">Campo magnetico B: N &rarr; S</div>
+          <div class="field-lines" aria-hidden="true">
+            <div class="field-line"></div>
+            <div class="field-line"></div>
+            <div class="field-line"></div>
+          </div>
+
+          <div class="coil-system" aria-hidden="true">
+            <div class="coil-wrap" id="coilWrap">
+              <div class="coil"></div>
+              <div class="axis"></div>
+            </div>
+            <div class="current-marker current-left" id="currentLeft">I &darr;</div>
+            <div class="current-marker current-right" id="currentRight">I &uarr;</div>
+            <div class="force-marker force-up" id="forceTop">&uarr; F</div>
+            <div class="force-marker force-down" id="forceBottom">&darr; F</div>
+          </div>
+
+          <div class="commutator-group" id="commutatorGroup" aria-hidden="true">
+            <div class="commutator">
+              <span class="brush left"></span>
+              <span class="split-ring"></span>
+              <span class="brush right"></span>
+            </div>
+            <div class="commutator-label">commutatore</div>
+          </div>
+
+          <div class="legend">
+            <span><i class="dot blue"></i>B = campo magnetico</span>
+            <span><i class="dot green"></i>I = corrente</span>
+            <span><i class="dot yellow"></i>F = forza</span>
+            <span><i class="dot copper"></i>bobina</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="controls card" aria-label="Pannello controlli">
+        <h2>Pannello controlli</h2>
+        <p class="control-intro">Clicca sulle icone <strong>i</strong> per aprire una spiegazione. Se ne apre una sola alla volta.</p>
+
+        <div class="control" data-info="model">
+          <div class="control-head">
+            <div class="control-title">MODELLO</div>
+          </div>
+          <div class="mode-switch" role="group" aria-label="Selezione modello">
+            <button class="mode-btn active" id="simpleBtn" type="button">Semplice</button>
+            <button class="mode-btn" id="realBtn" type="button">Realistico</button>
+          </div>
+        </div>
+
+        <div class="control-section-title">Parametri</div>
+
+        <div class="control">
+          <div class="control-head">
+            <div class="control-title">Corrente I <button class="info-btn" type="button" data-target="info-current" aria-label="Spiega corrente">i</button></div>
+            <span class="value"><span id="val-current">5</span> A</span>
+          </div>
+          <input id="currentSlider" type="range" min="0" max="10" value="5" step="0.1" data-value="val-current" />
+          <div class="info-panel" id="info-current">
+            <strong>Corrente I</strong>
+            La corrente I rappresenta l'intensita della corrente elettrica che attraversa la bobina. Nel motore, questa corrente interagisce con il campo magnetico e genera una forza sui lati della bobina. Se la corrente aumenta, aumenta anche la coppia che tende a mettere in rotazione il motore.
+          </div>
+        </div>
+
+        <div class="control">
+          <div class="control-head">
+            <div class="control-title">Campo magnetico B <button class="info-btn" type="button" data-target="info-field" aria-label="Spiega campo magnetico">i</button></div>
+            <span class="value"><span id="val-field">1.2</span> T</span>
+          </div>
+          <input id="fieldSlider" type="range" min="0" max="2" value="1.2" step="0.1" data-value="val-field" />
+          <div class="info-panel" id="info-field">
+            <strong>Campo magnetico B</strong>
+            Il campo magnetico B rappresenta l'intensita del campo presente tra i poli N e S. Quando la bobina e attraversata da corrente, il campo magnetico esercita una forza sui suoi lati. Un campo piu intenso produce una forza maggiore e quindi una rotazione piu energica.
+          </div>
+        </div>
+
+        <div class="control">
+          <div class="control-head">
+            <div class="control-title">Numero di spire N <button class="info-btn" type="button" data-target="info-turns" aria-label="Spiega numero di spire">i</button></div>
+            <span class="value"><span id="val-turns">18</span></span>
+          </div>
+          <input id="turnsSlider" type="range" min="1" max="50" value="18" step="1" data-value="val-turns" />
+          <div class="info-panel" id="info-turns">
+            <strong>Numero di spire N</strong>
+            Il numero di spire indica quante volte il filo e avvolto nella bobina. Ogni spira contribuisce alla produzione della coppia. Per questo, aumentando il numero di spire, aumenta l'effetto totale della corrente e il motore puo ruotare con maggiore forza.
+          </div>
+        </div>
+
+        <div class="control">
+          <div class="control-head">
+            <div class="control-title">Area bobina A <button class="info-btn" type="button" data-target="info-area" aria-label="Spiega area bobina">i</button></div>
+            <span class="value"><span id="val-area">1.0</span> m2</span>
+          </div>
+          <input id="areaSlider" type="range" min="0.1" max="2" value="1" step="0.1" data-value="val-area" />
+          <div class="info-panel" id="info-area">
+            <strong>Area bobina A</strong>
+            L'area A rappresenta la dimensione della superficie racchiusa dalla bobina. Una bobina piu grande ha lati piu distanti dall'asse di rotazione e puo generare un momento torcente maggiore. Per questo, aumentando l'area, aumenta la capacita della bobina di ruotare.
+          </div>
+        </div>
+
+        <div class="control" id="frictionControl">
+          <div class="control-head">
+            <div class="control-title">Attrito <button class="info-btn" type="button" data-target="info-friction" aria-label="Spiega attrito">i</button></div>
+            <span class="value"><span id="val-friction">0.20</span></span>
+          </div>
+          <input id="frictionSlider" type="range" min="0" max="1" value="0.2" step="0.01" data-value="val-friction" disabled />
+          <div class="disabled-note">Disponibile solo nella modalit&agrave; realistica.</div>
+          <div class="info-panel" id="info-friction">
+            <strong>Attrito</strong>
+            Nel modello semplice l'attrito non viene considerato: la simulazione mostra solo la coppia elettromagnetica ideale. Nel modello realistico, invece, lo slider Attrito controlla il termine b&omega;, cio&egrave; l'attrito dinamico. Questo effetto cresce con la velocit&agrave; angolare e riduce la coppia effettiva del motore.
+          </div>
+        </div>
+
+        <div class="control" id="inertiaControl">
+          <div class="control-head">
+            <div class="control-title">Inerzia <button class="info-btn" type="button" data-target="info-inertia" aria-label="Spiega inerzia">i</button></div>
+            <span class="value"><span id="val-inertia">3.0</span></span>
+          </div>
+          <input id="inertiaSlider" type="range" min="0.5" max="10" value="3" step="0.1" data-value="val-inertia" disabled />
+          <div class="disabled-note">Disponibile solo nella modalit&agrave; realistica.</div>
+          <div class="info-panel" id="info-inertia">
+            <strong>Inerzia</strong>
+            Nel modello semplice l'inerzia non viene usata, perch&eacute; l'obiettivo &egrave; mostrare solo il principio ideale della coppia. Nel modello realistico l'inerzia J entra nella formula &alpha; = &tau;<sub>eff</sub> / J: con maggiore inerzia, la stessa coppia produce un'accelerazione angolare pi&ugrave; piccola e il motore cambia velocit&agrave; pi&ugrave; lentamente.
+          </div>
+        </div>
+
+        <div class="control">
+          <div class="control-head">
+            <div class="control-title">Controelettromotrice Ke <button class="info-btn" type="button" data-target="info-ke" aria-label="Spiega controelettromotrice">i</button></div>
+            <span class="value"><span id="val-ke">0.30</span></span>
+          </div>
+          <input id="keSlider" type="range" min="0" max="1" value="0.3" step="0.01" data-value="val-ke" disabled />
+          <div class="disabled-note">Disponibile solo nella modalit&agrave; realistica.</div>
+          <div class="info-panel" id="info-ke">
+            <strong>Controelettromotrice Ke</strong>
+            Ke rappresenta l'intensit&agrave; della controelettromotrice, un effetto che compare quando il motore ruota. Nel modello realistico &egrave; descritta dal termine Ke&omega;: cresce con la velocit&agrave; angolare e si oppone alla coppia ideale. Nel modello semplice &egrave; disattivata, perch&eacute; si considera solo il principio elettromagnetico di base.
+          </div>
+        </div>
+
+        <div class="control-section-title">Opzioni</div>
+
+        <div class="control">
+          <div class="toggle-line">
+            <div class="control-title">Commutatore <button class="info-btn" type="button" data-target="info-commutator" aria-label="Spiega commutatore">i</button></div>
+            <button class="switch" id="commutatorSwitch" type="button" aria-label="Commutatore attivo" aria-pressed="true"></button>
+          </div>
+          <div class="info-panel" id="info-commutator">
+            <strong>Commutatore</strong>
+            Il commutatore &egrave; il componente che inverte il verso della corrente nella bobina ogni mezzo giro. Senza commutatore, la corrente non viene invertita: la coppia cambia direzione durante la rotazione e la bobina tende a oscillare attorno a una posizione di equilibrio, fino a fermarsi. Con il commutatore attivo, invece, la corrente viene invertita al momento giusto e la coppia continua a spingere la bobina nello stesso verso.
+          </div>
+        </div>
+
+        <div class="option-row">
+          <button class="action-btn" id="invertCurrentBtn" type="button">Inverti corrente <span class="info-btn" data-target="info-invert-current" role="button" tabindex="0" aria-label="Spiega inverti corrente">i</span></button>
+          <div class="info-panel" id="info-invert-current">
+            <strong>Inverti corrente</strong>
+            Questo comando inverte il verso della corrente nella bobina. Poiche il verso della forza magnetica dipende anche dal verso della corrente, invertire la corrente puo modificare il verso della coppia e quindi il comportamento della rotazione.
+          </div>
+
+          <button class="action-btn" id="invertPolarityBtn" type="button">Inverti polarit&agrave; <span class="info-btn" data-target="info-invert-polarity" role="button" tabindex="0" aria-label="Spiega inverti polarita">i</span></button>
+          <div class="info-panel" id="info-invert-polarity">
+            <strong>Inverti polarit&agrave;</strong>
+            Questo comando scambia i poli magnetici N e S. Invertendo la polarita cambia il verso del campo magnetico. Di conseguenza cambia anche il verso della forza esercitata sulla bobina, con possibile inversione della rotazione.
+          </div>
+        </div>
+
+        <div class="control-section-title">Comandi</div>
+        <div class="command-row">
+          <button class="command-btn primary" id="playPauseBtn" type="button">Play</button>
+          <button class="command-btn" id="resetBtn" type="button">Reset</button>
+        </div>
+      </aside>
+    </main>
+
+    <section class="data-zone" aria-label="Dati in tempo reale">
+      <div class="data-info-card card" id="dataInfo">
+        <h3>Cosa indicano questi dati?</h3>
+        <p>
+          I dati in tempo reale mostrano lo stato istantaneo del motore. L'angolo &theta; indica la posizione della bobina, mentre la velocit&agrave; angolare &omega; indica quanto rapidamente ruota. Nel modello semplice si osserva una visualizzazione didattica della coppia ideale: con il commutatore attivo il moto resta continuo, mentre senza commutatore la bobina oscilla e poi tende a fermarsi. Nel modello realistico compaiono anche controelettromotrice, attrito dinamico e accelerazione angolare: la coppia effettiva &egrave; usata per calcolare &alpha; = &tau;<sub>eff</sub> / J, quindi l'inerzia determina quanto velocemente cambia la velocit&agrave;.
+        </p>
+      </div>
+
+      <div class="data-card card">
+        <h2>Dati in tempo reale <button class="info-btn" id="dataInfoBtn" type="button" aria-label="Spiega dati in tempo reale">i</button></h2>
+        <div class="data-grid">
+          <div class="data-item">
+            <div class="data-label">Modalit&agrave;</div>
+            <div class="data-value" id="data-mode">Semplice</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Angolo &theta;</div>
+            <div class="data-value" id="data-angle">25&deg;</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Velocit&agrave; &omega;</div>
+            <div class="data-value" id="data-speed">0.00 rad/s</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Coppia base</div>
+            <div class="data-value" id="data-base-torque">0.00 N m</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Controelettromotrice</div>
+            <div class="data-value" id="data-back-emf">Non attiva</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Attrito dinamico</div>
+            <div class="data-value" id="data-dynamic-friction">Non attivo</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Coppia effettiva</div>
+            <div class="data-value" id="data-effective-torque">1.85 N m</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Accelerazione &alpha;</div>
+            <div class="data-value" id="data-acceleration">Non attiva</div>
+          </div>
+          <div class="data-item">
+            <div class="data-label">Stato</div>
+            <div class="data-value" id="data-status">In pausa</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const body = document.body;
+    const simpleBtn = document.getElementById('simpleBtn');
+    const realBtn = document.getElementById('realBtn');
+    const formulaText = document.getElementById('formulaText');
+    const formulaExplanation = document.getElementById('formulaExplanation');
+    const modePill = document.getElementById('modePill');
+
+    const currentSlider = document.getElementById('currentSlider');
+    const fieldSlider = document.getElementById('fieldSlider');
+    const turnsSlider = document.getElementById('turnsSlider');
+    const areaSlider = document.getElementById('areaSlider');
+    const frictionSlider = document.getElementById('frictionSlider');
+    const inertiaSlider = document.getElementById('inertiaSlider');
+    const keSlider = document.getElementById('keSlider');
+
+    const coilWrap = document.getElementById('coilWrap');
+    const currentLeft = document.getElementById('currentLeft');
+    const currentRight = document.getElementById('currentRight');
+    const forceTop = document.getElementById('forceTop');
+    const forceBottom = document.getElementById('forceBottom');
+    const leftMagnet = document.getElementById('leftMagnet');
+    const rightMagnet = document.getElementById('rightMagnet');
+    const fieldLabel = document.getElementById('fieldLabel');
+    const commutatorGroup = document.getElementById('commutatorGroup');
+    const simStatusChip = document.getElementById('simStatusChip');
+
+    const commutatorSwitch = document.getElementById('commutatorSwitch');
+    const invertCurrentBtn = document.getElementById('invertCurrentBtn');
+    const invertPolarityBtn = document.getElementById('invertPolarityBtn');
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    const dataMode = document.getElementById('data-mode');
+    const dataAngle = document.getElementById('data-angle');
+    const dataSpeed = document.getElementById('data-speed');
+    const dataBaseTorque = document.getElementById('data-base-torque');
+    const dataBackEmf = document.getElementById('data-back-emf');
+    const dataDynamicFriction = document.getElementById('data-dynamic-friction');
+    const dataEffectiveTorque = document.getElementById('data-effective-torque');
+    const dataAcceleration = document.getElementById('data-acceleration');
+    const dataStatus = document.getElementById('data-status');
+
+    const frictionControl = document.getElementById('frictionControl');
+    const inertiaControl = document.getElementById('inertiaControl');
+
+    // Possibilita 5.2: modello realistico ricalibrato e bug commutatore OFF corretto
+    const TAU_SCALE = 0.018;
+    const SIMPLE_SPEED_SCALE = 0.018;
+    const SIMPLE_OFF_SCALE = 0.045;
+    const SIMPLE_OFF_TORQUE_SCALE = 0.045;
+    const SIMPLE_OFF_DAMPING = 1.35;
+    const BACK_EMF_SCALE = 2.2;
+    const DYNAMIC_FRICTION_SCALE = 2.6;
+    const REAL_ACCEL_GAIN = 1.15;
+    const MAX_OMEGA = 12;
+
+    const state = {
+      mode: 'simple',
+      running: false,
+      theta: Math.PI / 7,
+      omega: 0,
+      currentDirection: 1,
+      fieldDirection: 1,
+      commutator: true,
+      lastTime: null,
+      lastBaseTorque: 0,
+      lastMotorTorque: 0,
+      lastBackEmf: 0,
+      lastDynamicFriction: 0,
+      lastEffectiveTorque: 0,
+      lastAcceleration: 0
+    };
+
+    function closeAllControlInfo() {
+      document.querySelectorAll('.info-panel.open').forEach(panel => panel.classList.remove('open'));
+      document.querySelectorAll('.info-btn.active').forEach(btn => {
+        if (btn.id !== 'dataInfoBtn') btn.classList.remove('active');
+      });
+    }
+
+    document.querySelectorAll('[data-target]').forEach(btn => {
+      btn.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        const targetId = btn.getAttribute('data-target');
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        const wasOpen = target.classList.contains('open');
+        closeAllControlInfo();
+        if (!wasOpen) {
+          target.classList.add('open');
+          btn.classList.add('active');
+        }
+      });
+    });
+
+    function formatSliderValue(input) {
+      const step = input.step || '1';
+      if (step.includes('.01')) return Number(input.value).toFixed(2);
+      if (step.includes('.1')) return Number(input.value).toFixed(1);
+      return input.value;
+    }
+
+    document.querySelectorAll('input[type="range"]').forEach(input => {
+      input.addEventListener('input', () => {
+        const valueId = input.getAttribute('data-value');
+        if (valueId) document.getElementById(valueId).textContent = formatSliderValue(input);
+        updateVisuals();
+      });
+    });
+
+    function setMode(mode) {
+      const realistic = mode === 'real';
+      state.mode = realistic ? 'real' : 'simple';
+      simpleBtn.classList.toggle('active', !realistic);
+      realBtn.classList.toggle('active', realistic);
+      body.classList.toggle('simple-mode', !realistic);
+      body.classList.toggle('real-mode', realistic);
+
+      frictionSlider.disabled = !realistic;
+      inertiaSlider.disabled = !realistic;
+      keSlider.disabled = !realistic;
+      frictionControl.classList.toggle('disabled-control', !realistic);
+      inertiaControl.classList.toggle('disabled-control', !realistic);
+      keSlider.closest('.control').classList.toggle('disabled-control', !realistic);
+
+      if (realistic) {
+        formulaText.innerHTML = '<span class="term-ideal">&tau;<sub>eff</sub> = N I A B sin(&theta;)</span> <span class="term-ke">- Ke&omega;</span> <span class="term-friction">- b&omega;</span><br><span class="term-motion">&alpha; = &tau;<sub>eff</sub> / J</span>';
+        formulaExplanation.innerHTML = `Nel modello realistico si parte dalla stessa coppia ideale del modello semplice, ma si aggiungono gli effetti che limitano il moto reale.<br><br>Il termine Ke&omega; rappresenta la controelettromotrice: quando il motore gira, si genera un effetto che si oppone alla rotazione e cresce con la velocit&agrave; angolare &omega;. Aumentando Ke, questo effetto diventa pi&ugrave; forte.<br><br>Il termine b&omega; rappresenta l'attrito dinamico: pi&ugrave; il motore gira velocemente, maggiore &egrave; l'effetto frenante dovuto alle perdite meccaniche. Aumentando Attrito, la velocit&agrave; si riduce pi&ugrave; facilmente.<br><br>Infine l'inerzia J entra nella formula &alpha; = &tau;<sub>eff</sub> / J: a parit&agrave; di coppia effettiva, un'inerzia maggiore produce un'accelerazione angolare pi&ugrave; piccola e rende pi&ugrave; lenta la partenza.`;
+        modePill.innerHTML = 'Modalit&agrave;: realistica';
+        dataMode.innerHTML = 'Realistica';
+      } else {
+        formulaText.innerHTML = '<span class="term-ideal">&tau; = N I A B sin(&theta;)</span>';
+        formulaExplanation.innerHTML = `Nel modello semplice viene mostrata la coppia elettromagnetica ideale prodotta dall'interazione tra corrente e campo magnetico. La coppia &tau; dipende dalla corrente I, dal campo magnetico B, dal numero di spire N, dall'area A della bobina e dall'angolo &theta;.<br><br>Per rendere la visualizzazione chiara, con il commutatore attivo la bobina ruota in modo continuo usando l'intensit&agrave; della coppia ideale. Se il commutatore viene disattivato, la corrente non viene invertita ogni mezzo giro: la bobina tende quindi a oscillare e poi a fermarsi. In questa modalit&agrave; non vengono considerati attrito, inerzia, controelettromotrice o altri effetti realistici.`;
+        modePill.innerHTML = 'Modalit&agrave;: semplice';
+        dataMode.innerHTML = 'Semplice';
+      }
+      updateVisuals();
+    }
+
+    function getParams() {
+      return {
+        I: Number(currentSlider.value),
+        B: Number(fieldSlider.value),
+        N: Number(turnsSlider.value),
+        A: Number(areaSlider.value),
+        friction: Number(frictionSlider.value),
+        J: Number(inertiaSlider.value),
+        Ke: Number(keSlider.value)
+      };
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function signOrOne(value) {
+      return value >= 0 ? 1 : -1;
+    }
+
+    function commutatorPhase() {
+      return state.commutator ? signOrOne(Math.sin(state.theta)) : 1;
+    }
+
+    function computePhysics() {
+      const p = getParams();
+      const driveSign = state.currentDirection * state.fieldDirection;
+      const idealSin = Math.sin(state.theta);
+      const driveStrength = p.N * p.I * p.A * p.B;
+      const idealTorque = driveStrength * TAU_SCALE * idealSin * driveSign;
+      const motorTorque = state.commutator
+        ? driveStrength * TAU_SCALE * Math.abs(idealSin) * driveSign
+        : idealTorque;
+
+      let backEmfTorque = 0;
+      let dynamicFrictionTorque = 0;
+      let effectiveTorque = motorTorque;
+      let acceleration = 0;
+
+      if (state.mode === 'real') {
+        backEmfTorque = p.Ke * BACK_EMF_SCALE * state.omega;
+        dynamicFrictionTorque = p.friction * DYNAMIC_FRICTION_SCALE * state.omega;
+        effectiveTorque = motorTorque - backEmfTorque - dynamicFrictionTorque;
+        acceleration = (effectiveTorque / Math.max(p.J, 0.1)) * REAL_ACCEL_GAIN;
+      }
+
+      state.lastBaseTorque = motorTorque;
+      state.lastMotorTorque = motorTorque;
+      state.lastBackEmf = backEmfTorque;
+      state.lastDynamicFriction = dynamicFrictionTorque;
+      state.lastEffectiveTorque = effectiveTorque;
+      state.lastAcceleration = acceleration;
+      return { ...p, driveStrength, idealTorque, motorTorque, backEmfTorque, dynamicFrictionTorque, effectiveTorque, acceleration };
+    }
+
+    function step(dt) {
+      const p = computePhysics();
+      const driveSign = state.currentDirection * state.fieldDirection;
+
+      if (p.I === 0 || p.B === 0 || p.N === 0 || p.A === 0) {
+        state.omega *= Math.max(0, 1 - dt * 2.2);
+      } else if (state.mode === 'simple') {
+        if (state.commutator) {
+          const visualSpeed = clamp(p.driveStrength * SIMPLE_SPEED_SCALE, 0, MAX_OMEGA);
+          state.omega = driveSign * visualSpeed;
+        } else {
+          // Senza commutatore usiamo un'oscillazione didattica smorzata:
+          // la coppia cambia verso con sin(theta), quindi la bobina viene richiamata
+          // attorno a una posizione di equilibrio invece di ruotare continuamente.
+          const restoringAcceleration = p.driveStrength * SIMPLE_OFF_TORQUE_SCALE * Math.sin(state.theta) * driveSign;
+          const damping = SIMPLE_OFF_DAMPING * state.omega;
+          state.omega += (restoringAcceleration - damping) * dt;
+          state.omega = clamp(state.omega, -MAX_OMEGA * 0.75, MAX_OMEGA * 0.75);
+        }
+      } else {
+        state.omega += p.acceleration * dt;
+        state.omega = clamp(state.omega, -MAX_OMEGA, MAX_OMEGA);
+      }
+
+      if (Math.abs(state.omega) < 0.003 && Math.abs(state.lastEffectiveTorque) < 0.02) state.omega = 0;
+      if (state.mode === 'simple' && !state.commutator && Math.abs(state.omega) < 0.006 && Math.abs(Math.sin(state.theta)) < 0.012) state.omega = 0;
+      state.theta += state.omega * dt;
+      updateVisuals();
+    }
+
+    function niceNumber(value, digits = 2) {
+      if (!Number.isFinite(value)) return '0.00';
+      return value.toFixed(digits).replace('-0.00', '0.00');
+    }
+
+    function degFromRad(rad) {
+      let deg = (rad * 180 / Math.PI) % 360;
+      if (deg < 0) deg += 360;
+      return deg;
+    }
+
+    function currentDirectionLabel(visualCurrentDirection) {
+      return visualCurrentDirection > 0 ? ['I ↓', 'I ↑'] : ['I ↑', 'I ↓'];
+    }
+
+    function updateVisuals() {
+      computePhysics();
+      const visualAngle = degFromRad(state.theta) - 12;
+      coilWrap.style.transform = `translate(-50%, -50%) rotate(${visualAngle}deg)`;
+
+      const visualCurrentDirection = state.currentDirection * commutatorPhase();
+      const currentLabels = currentDirectionLabel(visualCurrentDirection);
+      currentLeft.textContent = currentLabels[0];
+      currentRight.textContent = currentLabels[1];
+      currentLeft.classList.toggle('reversed', visualCurrentDirection < 0);
+      currentRight.classList.toggle('reversed', visualCurrentDirection < 0);
+
+      const torqueDirection = state.commutator
+        ? state.currentDirection * state.fieldDirection
+        : state.currentDirection * state.fieldDirection * signOrOne(Math.sin(state.theta));
+      forceTop.textContent = torqueDirection > 0 ? '↑ F' : '↓ F';
+      forceBottom.textContent = torqueDirection > 0 ? '↓ F' : '↑ F';
+      forceTop.classList.toggle('reversed', torqueDirection < 0);
+      forceBottom.classList.toggle('reversed', torqueDirection < 0);
+
+      leftMagnet.textContent = state.fieldDirection > 0 ? 'N' : 'S';
+      rightMagnet.textContent = state.fieldDirection > 0 ? 'S' : 'N';
+      fieldLabel.innerHTML = state.fieldDirection > 0 ? 'Campo magnetico B: N &rarr; S' : 'Campo magnetico B: S &larr; N';
+      document.querySelector('.motor-stage').classList.toggle('field-reversed', state.fieldDirection < 0);
+
+      commutatorSwitch.classList.toggle('off', !state.commutator);
+      commutatorSwitch.setAttribute('aria-pressed', String(state.commutator));
+      commutatorGroup.classList.toggle('off', !state.commutator);
+
+      invertCurrentBtn.classList.toggle('active-state', state.currentDirection < 0);
+      invertPolarityBtn.classList.toggle('active-state', state.fieldDirection < 0);
+      body.classList.toggle('running', state.running);
+      playPauseBtn.textContent = state.running ? 'Pausa' : 'Play';
+
+      const angle = degFromRad(state.theta);
+      const base = state.lastBaseTorque;
+      const eff = state.lastEffectiveTorque;
+      dataAngle.textContent = `${niceNumber(angle, 0)}°`;
+      dataSpeed.textContent = `${niceNumber(state.omega, 2)} rad/s`;
+      dataBaseTorque.textContent = `${niceNumber(base, 2)} N m`;
+      dataEffectiveTorque.textContent = `${niceNumber(eff, 2)} N m`;
+      dataBaseTorque.classList.toggle('negative', base < -0.001);
+      dataBaseTorque.classList.toggle('positive', base > 0.001);
+      dataEffectiveTorque.classList.toggle('negative', eff < -0.001);
+      dataEffectiveTorque.classList.toggle('positive', eff > 0.001);
+
+      if (state.mode === 'real') {
+        dataBackEmf.textContent = `${niceNumber(Math.abs(state.lastBackEmf), 2)} N m`;
+        dataDynamicFriction.textContent = `${niceNumber(Math.abs(state.lastDynamicFriction), 2)} N m`;
+        dataAcceleration.textContent = `${niceNumber(state.lastAcceleration, 2)} rad/s²`;
+      } else {
+        dataBackEmf.textContent = 'Non attiva';
+        dataDynamicFriction.textContent = 'Non attivo';
+        dataAcceleration.textContent = 'Non attiva';
+      }
+
+      let status = 'In pausa';
+      if (state.running) {
+        if (pIsInactive()) status = 'Parametri nulli';
+        else if (!state.commutator) status = state.mode === 'simple' ? 'Oscillazione smorzata' : 'Moto non continuo';
+        else if (state.mode === 'simple') status = 'Rotazione didattica';
+        else if (Math.abs(eff) < 0.12 && Math.abs(state.omega) > 0.5) status = 'Rotazione stabile';
+        else if (state.omega > 0) status = 'Rotazione antioraria';
+        else if (state.omega < 0) status = 'Rotazione oraria';
+        else status = 'In accelerazione';
+      }
+      dataStatus.textContent = status;
+      simStatusChip.innerHTML = `<span class="status-dot"></span> ${status.toLowerCase()}`;
+    }
+
+    function pIsInactive() {
+      const p = getParams();
+      return p.I === 0 || p.B === 0 || p.N === 0 || p.A === 0;
+    }
+
+    function resetSimulation() {
+      state.theta = Math.PI / 7;
+      state.omega = 0;
+      state.lastTime = null;
+      updateVisuals();
+    }
+
+    function animate(timestamp) {
+      if (state.lastTime === null) state.lastTime = timestamp;
+      const dt = Math.min((timestamp - state.lastTime) / 1000, 0.04);
+      state.lastTime = timestamp;
+      if (state.running) step(dt);
+      requestAnimationFrame(animate);
+    }
+
+    simpleBtn.addEventListener('click', () => setMode('simple'));
+    realBtn.addEventListener('click', () => setMode('real'));
+
+    commutatorSwitch.addEventListener('click', () => {
+      state.commutator = !state.commutator;
+      updateVisuals();
+    });
+
+    invertCurrentBtn.addEventListener('click', event => {
+      if (event.target.closest('.info-btn')) return;
+      state.currentDirection *= -1;
+      updateVisuals();
+    });
+
+    invertPolarityBtn.addEventListener('click', event => {
+      if (event.target.closest('.info-btn')) return;
+      state.fieldDirection *= -1;
+      updateVisuals();
+    });
+
+    playPauseBtn.addEventListener('click', () => {
+      state.running = !state.running;
+      state.lastTime = null;
+      updateVisuals();
+    });
+
+    resetBtn.addEventListener('click', resetSimulation);
+
+    const dataInfoBtn = document.getElementById('dataInfoBtn');
+    const dataInfo = document.getElementById('dataInfo');
+    dataInfoBtn.addEventListener('click', () => {
+      const open = dataInfo.classList.toggle('open');
+      dataInfoBtn.classList.toggle('active', open);
+    });
+
+    setMode('simple');
+    resetSimulation();
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
